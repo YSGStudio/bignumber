@@ -90,7 +90,7 @@ function getTotalValue(placedCards: Record<number, number>): bigint {
 export default function Home() {
   const [selectedPlaces, setSelectedPlaces] = useState<number[]>([0, 1, 2, 3, 4]);
   const [placedCards, setPlacedCards] = useState<Record<number, number>>({});
-  const [allowDuplicates, setAllowDuplicates] = useState(true);
+  const [dupMode, setDupMode] = useState<'all' | 'zero' | 'none'>('all');
   const [isLearningMode, setIsLearningMode] = useState(false);
   const [revealedPlaces, setRevealedPlaces] = useState<Set<number>>(new Set());
   const [activePlaceInfo, setActivePlaceInfo] = useState<number | null>(null);
@@ -155,7 +155,8 @@ export default function Home() {
 
   const handleDragStart = (e: React.DragEvent, digit: number) => {
     if (isLearningMode) return;
-    if (!allowDuplicates && usedDigits.includes(digit)) return;
+    if (dupMode === 'none' && usedDigits.includes(digit)) return;
+    if (dupMode === 'zero' && digit !== 0 && usedDigits.includes(digit)) return;
     draggingDigit.current = digit;
     e.dataTransfer.effectAllowed = "move";
   };
@@ -175,7 +176,7 @@ export default function Home() {
     const digit = draggingDigit.current;
     if (digit === null) return;
 
-    if (!allowDuplicates) {
+    if (dupMode === 'none' || (dupMode === 'zero' && digit !== 0)) {
       const usedElsewhere = Object.entries(placedCards).some(
         ([i, d]) => d === digit && Number(i) !== placeIdx
       );
@@ -220,9 +221,9 @@ export default function Home() {
     setDragOver(null);
   };
 
-  const setMode = (allow: boolean) => {
+  const setMode = (mode: 'all' | 'zero' | 'none') => {
     if (isLearningMode) return;
-    setAllowDuplicates(allow);
+    setDupMode(mode);
     setPlacedCards({});
     setActivePlaceInfo(null);
   };
@@ -266,15 +267,16 @@ export default function Home() {
             <h2 className="text-base font-bold text-gray-600 mb-2">⚙️ 중복 설정</h2>
             <div className="flex gap-3">
               {[
-                { label: "중복 허용", value: true },
-                { label: "중복 불허", value: false },
+                { label: "중복 허용", value: 'all' as const },
+                { label: "0만 중복 허용", value: 'zero' as const },
+                { label: "중복 불허", value: 'none' as const },
               ].map(({ label, value }) => (
                 <button
                   key={label}
                   onClick={() => setMode(value)}
                   disabled={isLearningMode}
                   className={`px-5 py-2 rounded-full font-bold text-sm transition-all shadow-sm ${
-                    allowDuplicates === value
+                    dupMode === value
                       ? "bg-indigo-500 text-white shadow-indigo-200 shadow-md"
                       : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -334,7 +336,9 @@ export default function Home() {
           <div className="flex flex-wrap gap-3 justify-center">
             {Array.from({ length: 10 }, (_, digit) => {
               const disabled =
-                isLearningMode || (!allowDuplicates && usedDigits.includes(digit));
+                isLearningMode ||
+                (dupMode === 'none' && usedDigits.includes(digit)) ||
+                (dupMode === 'zero' && digit !== 0 && usedDigits.includes(digit));
               const c = CARD_COLORS[digit];
               return (
                 <div
