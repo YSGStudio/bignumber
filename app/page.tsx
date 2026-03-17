@@ -121,7 +121,7 @@ export default function Home() {
   // ── 슬롯 크기 동적 계산 ──
   const slotConfig = useMemo(() => {
     const n = sortedPlaces.length;
-    if (n === 0) return { size: 56, gap: 8, groupGap: 20, fontSize: "1.375rem", labelSize: "0.75rem" };
+    if (n === 0) return { size: 56, height: 84, gap: 8, groupGap: 20, fontSize: "1.375rem", labelSize: "0.75rem" };
     const numBoundaries = new Set(sortedPlaces.map((i) => Math.floor(i / 4))).size - 1;
     const gap = 8;
     const groupGap = 20; // 그룹 경계 추가 여백
@@ -129,7 +129,8 @@ export default function Home() {
     const size = Math.max(24, Math.min(56, Math.floor((containerWidth - totalFixed) / n)));
     const fontSize = `${Math.max(12, Math.round(size * 0.44))}px`;
     const labelSize = `${Math.max(9, Math.round(size * 0.22))}px`;
-    return { size, gap, groupGap, fontSize, labelSize };
+    const height = Math.round(size * 1.5);
+    return { size, height, gap, groupGap, fontSize, labelSize };
   }, [sortedPlaces, containerWidth]);
 
   // ── 핸들러 ──
@@ -409,7 +410,7 @@ export default function Home() {
                       onClick={() => handleSlotClick(placeIdx)}
                       style={{
                         width: `${slotConfig.size}px`,
-                        height: `${slotConfig.size}px`,
+                        height: `${slotConfig.height}px`,
                         fontSize: slotConfig.fontSize,
                         borderRadius: `${Math.round(slotConfig.size * 0.25)}px`,
                       }}
