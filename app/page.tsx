@@ -319,6 +319,7 @@ export default function Home() {
               {[
                 { label: "천 자리까지 0 삽입", limit: 4 },
                 { label: "천만 자리까지 0 삽입", limit: 8 },
+                { label: "천억 자리까지 0 삽입", limit: 12 },
               ].map(({ label, limit }) => (
                 <button
                   key={label}
