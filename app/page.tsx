@@ -317,8 +317,8 @@ export default function Home() {
               ))}
               <div className="w-px bg-gray-200 mx-1" />
               {[
-                { label: "4자리까지 0 삽입", limit: 4 },
-                { label: "8자리까지 0 삽입", limit: 8 },
+                { label: "천 자리까지 0 삽입", limit: 4 },
+                { label: "천만 자리까지 0 삽입", limit: 8 },
               ].map(({ label, limit }) => (
                 <button
                   key={label}
