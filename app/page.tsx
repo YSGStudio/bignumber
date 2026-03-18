@@ -90,7 +90,8 @@ function getTotalValue(placedCards: Record<number, number>): bigint {
 export default function Home() {
   const [selectedPlaces, setSelectedPlaces] = useState<number[]>([0, 1, 2, 3, 4]);
   const [placedCards, setPlacedCards] = useState<Record<number, number>>({});
-  const [dupMode, setDupMode] = useState<'all' | 'zero' | 'none'>('all');
+  const [dupMode, setDupMode] = useState<'all' | 'none'>('all');
+  const [autoFilledSlots, setAutoFilledSlots] = useState<Set<number>>(new Set());
   const [isLearningMode, setIsLearningMode] = useState(false);
   const [revealedPlaces, setRevealedPlaces] = useState<Set<number>>(new Set());
   const [activePlaceInfo, setActivePlaceInfo] = useState<number | null>(null);
@@ -110,7 +111,10 @@ export default function Home() {
   }, []);
 
   // ── computed ──
-  const usedDigits = Object.values(placedCards);
+  // 자동 삽입된 0은 중복 체크에서 제외
+  const usedDigits = Object.entries(placedCards)
+    .filter(([idx]) => !autoFilledSlots.has(Number(idx)))
+    .map(([, d]) => d);
   const sortedPlaces = [...selectedPlaces].sort((a, b) => b - a); // 높은 자리 → 낮은 자리
   const allFilled =
     selectedPlaces.length > 0 &&
@@ -149,6 +153,7 @@ export default function Home() {
       }
       if (next.length === 0) return prev; // 최소 1자리
       setPlacedCards({});
+      setAutoFilledSlots(new Set());
       setActivePlaceInfo(null);
       return next;
     });
@@ -157,7 +162,6 @@ export default function Home() {
   const handleDragStart = (e: React.DragEvent, digit: number) => {
     if (isLearningMode) return;
     if (dupMode === 'none' && usedDigits.includes(digit)) return;
-    if (dupMode === 'zero' && digit !== 0 && usedDigits.includes(digit)) return;
     draggingDigit.current = digit;
     e.dataTransfer.effectAllowed = "move";
   };
@@ -177,14 +181,21 @@ export default function Home() {
     const digit = draggingDigit.current;
     if (digit === null) return;
 
-    if (dupMode === 'none' || (dupMode === 'zero' && digit !== 0)) {
+    if (dupMode === 'none') {
+      // 자동 삽입 슬롯은 제외하고 중복 체크
       const usedElsewhere = Object.entries(placedCards).some(
-        ([i, d]) => d === digit && Number(i) !== placeIdx
+        ([i, d]) => d === digit && Number(i) !== placeIdx && !autoFilledSlots.has(Number(i))
       );
       if (usedElsewhere) return;
     }
 
     setPlacedCards((prev) => ({ ...prev, [placeIdx]: digit }));
+    // 수동으로 배치하면 autoFilled에서 제거
+    setAutoFilledSlots((prev) => {
+      const next = new Set(prev);
+      next.delete(placeIdx);
+      return next;
+    });
     draggingDigit.current = null;
   };
 
@@ -199,6 +210,11 @@ export default function Home() {
         setPlacedCards((prev) => {
           const next = { ...prev };
           delete next[placeIdx];
+          return next;
+        });
+        setAutoFilledSlots((prev) => {
+          const next = new Set(prev);
+          next.delete(placeIdx);
           return next;
         });
         if (activePlaceInfo === placeIdx) setActivePlaceInfo(null);
@@ -216,17 +232,32 @@ export default function Home() {
   const handleReset = () => {
     setSelectedPlaces([0, 1, 2, 3, 4]);
     setPlacedCards({});
+    setAutoFilledSlots(new Set());
     setIsLearningMode(false);
     setRevealedPlaces(new Set());
     setActivePlaceInfo(null);
     setDragOver(null);
   };
 
-  const setMode = (mode: 'all' | 'zero' | 'none') => {
+  const setMode = (mode: 'all' | 'none') => {
     if (isLearningMode) return;
     setDupMode(mode);
     setPlacedCards({});
+    setAutoFilledSlots(new Set());
     setActivePlaceInfo(null);
+  };
+
+  // 선택된 자릿수 중 limit 미만 자리에 0 자동 삽입
+  const fillZerosUpTo = (limit: number) => {
+    if (isLearningMode) return;
+    const newCards = { ...placedCards };
+    const newAutoFilled = new Set(autoFilledSlots);
+    selectedPlaces.filter((p) => p < limit).forEach((p) => {
+      newCards[p] = 0;
+      newAutoFilled.add(p);
+    });
+    setPlacedCards(newCards);
+    setAutoFilledSlots(newAutoFilled);
   };
 
   // ── 자릿값 정보 ──
@@ -266,10 +297,9 @@ export default function Home() {
           {/* 중복 모드 */}
           <div>
             <h2 className="text-base font-bold text-gray-600 mb-2">⚙️ 중복 설정</h2>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               {[
                 { label: "중복 허용", value: 'all' as const },
-                { label: "0만 중복 허용", value: 'zero' as const },
                 { label: "중복 불허", value: 'none' as const },
               ].map(({ label, value }) => (
                 <button
@@ -281,6 +311,20 @@ export default function Home() {
                       ? "bg-indigo-500 text-white shadow-indigo-200 shadow-md"
                       : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  {label}
+                </button>
+              ))}
+              <div className="w-px bg-gray-200 mx-1" />
+              {[
+                { label: "4자리까지 0 삽입", limit: 4 },
+                { label: "8자리까지 0 삽입", limit: 8 },
+              ].map(({ label, limit }) => (
+                <button
+                  key={label}
+                  onClick={() => fillZerosUpTo(limit)}
+                  disabled={isLearningMode || selectedPlaces.filter(p => p < limit).length === 0}
+                  className="px-5 py-2 rounded-full font-bold text-sm transition-all shadow-sm bg-emerald-100 text-emerald-700 hover:bg-emerald-200 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {label}
                 </button>
@@ -338,8 +382,7 @@ export default function Home() {
             {Array.from({ length: 10 }, (_, digit) => {
               const disabled =
                 isLearningMode ||
-                (dupMode === 'none' && usedDigits.includes(digit)) ||
-                (dupMode === 'zero' && digit !== 0 && usedDigits.includes(digit));
+                (dupMode === 'none' && usedDigits.includes(digit));
               const c = CARD_COLORS[digit];
               return (
                 <div
